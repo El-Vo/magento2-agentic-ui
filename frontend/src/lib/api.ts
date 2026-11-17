@@ -45,10 +45,15 @@ export interface Intent {
   excerpt?: string
 }
 
+export interface ToolStep {
+  tool: string
+}
+
 export interface ChatResponse {
   session_id: string
   text?: string
   intents?: Intent[]
+  tool_trace?: ToolStep[]
   cart?: Cart
 }
 
@@ -70,6 +75,22 @@ export async function confirmAction(sessionId: string, tool: string, args: Recor
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ session_id: sessionId, tool, args }),
   })
+  if (!res.ok) throw new Error(`agent error: ${res.status}`)
+  return res.json()
+}
+
+export async function addToCart(sku: string): Promise<{ cart?: Cart }> {
+  const res = await fetch(`${API_BASE}/cart/add`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sku }),
+  })
+  if (!res.ok) throw new Error(`agent error: ${res.status}`)
+  return res.json()
+}
+
+export async function getCart(): Promise<{ cart?: Cart }> {
+  const res = await fetch(`${API_BASE}/cart`)
   if (!res.ok) throw new Error(`agent error: ${res.status}`)
   return res.json()
 }

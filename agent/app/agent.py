@@ -53,11 +53,17 @@ class AgentService:
         self.client = Mistral(api_key=settings.mistral_api_key) if settings.llm_enabled else None
 
     async def run(self, session: Session, message: str) -> dict[str, Any]:
-        if self.client:
-            return await self._run_llm(session, message)
-        return await self._run_mock(session, message)
+        trace: list[dict[str, Any]] = []
+        result = await self._run(session, message, trace)
+        result["tool_trace"] = trace
+        return result
 
-    async def _run_llm(self, session: Session, message: str) -> dict[str, Any]:
+    async def _run(self, session: Session, message: str, trace: list[dict[str, Any]]) -> dict[str, Any]:
+        if self.client:
+            return await self._run_llm(session, message, trace)
+        return await self._run_mock(session, message, trace)
+
+    async def _run_llm(self, session: Session, message: str, trace: list[dict[str, Any]]) -> dict[str, Any]:
         session.history.append({"role": "user", "content": message})
         session.history.insert(0, {"role": "system", "content": SYSTEM_PROMPT})
         messages = list(session.history)
@@ -82,6 +88,7 @@ class AgentService:
                     raw_args = call.function.arguments or "{}"
                     args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
                     result = await self._dispatch(session, call.function.name, args)
+                    trace.append({"tool": call.function.name, "args": args})
                     intents.append(result)
                     messages.append({
                         "role": "tool",
@@ -95,12 +102,13 @@ class AgentService:
         session.history.append({"role": "assistant", "content": " ".join(text_parts)})
         return {"text": " ".join(text_parts), "intents": intents}
 
-    async def _run_mock(self, session: Session, message: str) -> dict[str, Any]:
+    async def _run_mock(self, session: Session, message: str, trace: list[dict[str, Any]]) -> dict[str, Any]:
         intents: list[dict[str, Any]] = []
         text: str
         search = re.sub(r"\b(suche|such|show|zeig|find|search)\b", "", message, flags=re.I).strip()
         if search:
             result = await self._dispatch(session, "search_products", {"search": search, "page_size": 4})
+            trace.append({"tool": "search_products", "args": {"search": search}})
             intents.append(result)
             text = f"[mock] Suche nach {search!r} ergab {result.get('total_count', 0)} Treffer."
         else:

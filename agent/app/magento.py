@@ -20,6 +20,10 @@ class MagentoGraphQLError(RuntimeError):
 
 class MagentoClient:
     def __init__(self, base_url: str | None = None, token: str | None = None) -> None:
+        if token is None:
+            # Dauerhaft angemeldeter Demo-Customer: alle Calls laufen mit dessen Token.
+            from app.customer import get_cached_token
+            token = get_cached_token()
         self.base_url = (base_url or settings.magento_graphql_url).rstrip("/")
         self.token = token
 

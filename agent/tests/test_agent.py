@@ -133,7 +133,7 @@ async def test_llm_tool_call_loop_dispatches_via_function_name(monkeypatch):
         _completion(content="Hier sind die Treffer."),
     ])
     session = Session()
-    result = await service._run_llm(session, "zeig mir wanderschuhe")
+    result = await service._run_llm(session, "zeig mir wanderschuhe", [])
 
     assert result["text"] == "Hier sind die Treffer."
     product_lists = [i for i in result["intents"] if i["intent"] == "product_list"]

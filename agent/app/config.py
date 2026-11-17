@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     magento_store_code: str = "default"
     agent_allowed_origin: str = "http://localhost:5173"
     max_tool_calls_per_turn: int = 6
+    # Dauerhaft angemeldeter Demo-Customer (Agent handelt in seinem Namen)
+    persistent_customer_email: str = "demo.kunde@agentic.local"
+    persistent_customer_password: str = "Demo!Kunde123"
 
     @property
     def magento_graphql_url(self) -> str:

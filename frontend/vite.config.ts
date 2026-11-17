@@ -23,6 +23,11 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    strictPort: true,
+    // Codespaces/Dev-Tunnels liefern Requests mit externem Host-Header
+    // (z.B. https://<codespace>-5173.app.github.dev). Vite >= 5.4 antwortet auf
+    // unbekannte Hosts sonst mit 403 "Blocked request" – localhost/IPs bleiben erlaubt.
+    allowedHosts: ['.app.github.dev', '.githubpreview.dev', '.dev.tunnels.ms', '.vscode-cdn.net'],
     proxy: {
       '/api': {
         target: process.env.AGENT_URL || 'http://localhost:8000',

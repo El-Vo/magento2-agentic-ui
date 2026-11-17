@@ -1,20 +1,26 @@
-import { DbButton, DbChip, DbHeadline, DbLink, DbTag } from '@db-ui/react-elements'
+import { DbButton, DbChip, DbHeadline, DbTag } from '@db-ui/react-elements'
 import type { Cart, Intent, ProductCard } from '../lib/api'
 import { formatPrice } from '../lib/api'
 
-export function ProductCardView({ product, magentoUrl }: { product: ProductCard; magentoUrl: string }) {
-  const url = product.url_key ? `${magentoUrl}/${product.url_key}` : '#'
+export function ProductCardView({ product, onAdd }: { product: ProductCard; onAdd?: (sku: string) => void }) {
   const inStock = product.stock_status === 'IN_STOCK'
   return (
-    <a className="product-card" href={url} target="_blank" rel="noreferrer">
+    <div className="product-card">
       <span className="product-position">{product.position}</span>
       <div className="product-info">
         <strong>{product.name}</strong>
         <span className="product-sku">{product.sku}</span>
         <DbTag variant={inStock ? 'success' : 'error'} small>{inStock ? 'Auf Lager' : 'Nicht verfügbar'}</DbTag>
       </div>
-      <span className="product-price">{formatPrice(product.price)}</span>
-    </a>
+      <div className="product-buy">
+        <span className="product-price">{formatPrice(product.price)}</span>
+        {onAdd && (
+          <DbButton variant="primary" onClick={() => onAdd(product.sku ?? '')}>
+            In den Warenkorb
+          </DbButton>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -81,9 +87,8 @@ export function CartView({ cart, onCheckout, onClose }: {
   )
 }
 
-export function CheckoutView({ cart, magentoUrl, onBack }: {
+export function CheckoutView({ cart, onBack }: {
   cart?: Cart
-  magentoUrl: string
   onBack: () => void
 }) {
   const items = cart?.items ?? []
@@ -134,7 +139,7 @@ export function CheckoutView({ cart, magentoUrl, onBack }: {
           </dl>
           <div className="pane-footer">
             <DbButton variant="secondary-outline" onClick={onBack}>Zurück zum Warenkorb</DbButton>
-            <DbButton variant="primary" onClick={() => window.open(`${magentoUrl}/checkout`, '_blank', 'noreferrer')}>Checkout</DbButton>
+            <DbButton variant="primary" disabled title="Checkout folgt in einer späteren Ausbaustufe">Checkout</DbButton>
           </div>
         </section>
       </div>
@@ -161,12 +166,11 @@ export function ConfirmDialog({ intent, onConfirm, onDismiss }: {
   )
 }
 
-export function PolicyAnswer({ intent, magentoUrl }: { intent: Intent; magentoUrl: string }) {
+export function PolicyAnswer({ intent }: { intent: Intent }) {
   return (
     <div className="policy-answer">
       <strong>{intent.title}</strong>
       <p>{intent.excerpt?.slice(0, 400)}…</p>
-      <DbLink href={`${magentoUrl}/${intent.url_key}`} target="_blank">Quelle: CMS-Seite →</DbLink>
     </div>
   )
 }

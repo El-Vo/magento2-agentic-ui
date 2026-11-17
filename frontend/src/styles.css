@@ -45,10 +45,6 @@ button { font-family: inherit; }
   flex-shrink: 0;
 }
 
-.brand { display: flex; align-items: center; gap: var(--db-spacing-sm); }
-.brand db-headline { font-family: var(--db-font-family-headline); }
-.logo-mark { display: block; }
-
 .header-actions { display: flex; align-items: center; gap: var(--db-spacing-m); }
 
 .badge {
@@ -107,6 +103,42 @@ button { font-family: inherit; }
 }
 .turn.user .bubble { background: var(--db-color-red-500); color: #fff; }
 .turn.agent .bubble { background: var(--db-color-cool-gray-100); color: var(--db-color-cool-gray-700); }
+
+/* ---------- Tool-Aufrufe & Thinking-Animation ---------- */
+.tool-trace {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--db-spacing-xs);
+  margin-bottom: var(--db-spacing-xs);
+}
+
+.tool-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--db-color-cool-gray-100);
+  border: 1px solid var(--db-color-cool-gray-200);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  padding: 2px 10px;
+  color: var(--db-color-cool-gray-600);
+}
+
+.thinking { display: inline-flex; align-items: center; gap: 6px; padding: var(--db-spacing-sm) 0; }
+.thinking span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--db-color-red-500);
+  animation: thinking-bounce 1.2s infinite ease-in-out;
+}
+.thinking span:nth-child(2) { animation-delay: 0.15s; }
+.thinking span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes thinking-bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+  40% { transform: translateY(-6px); opacity: 1; }
+}
 
 .intent-block { margin-top: var(--db-spacing-s); text-align: left; }
 
@@ -169,6 +201,13 @@ button { font-family: inherit; }
 .product-info strong { color: var(--db-color-black); }
 .product-sku { font-size: 0.78rem; color: var(--db-color-cool-gray-400); }
 .product-price { font-weight: 700; color: var(--db-color-black); }
+.product-buy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--db-spacing-xs);
+  margin-left: auto;
+}
 
 /* ---------- Filter-Chips (db-chip) ---------- */
 .filter-chips { display: flex; flex-wrap: wrap; gap: var(--db-spacing-s); margin-top: var(--db-spacing-sm); }
