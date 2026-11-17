@@ -1,4 +1,4 @@
-.PHONY: help setup demo demo-stop ps codespace db search magento agent agent-dev agent-test widget widget-install widget-build clean purge
+.PHONY: help setup demo demo-stop ps codespace db search magento agent agent-dev agent-test widget widget-install widget-build e2e e2e-live cy-open clean purge
 
 help: ## Uebersicht aller Targets
 	@grep -hE '^[a-z_-]+:.*?##' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?##"} {printf "  %-16s %s\n", $$1, $$2}'
@@ -63,6 +63,15 @@ widget-up: ## Chat-Widget im Hintergrund starten (wie im Codespace)
 
 widget-build:
 	cd frontend && npm run build
+
+e2e: ## Cypress-e2e-Suite gegen das gebaute Widget (Agent-API gemockt, kein Magento noetig)
+	bash scripts/e2e.sh
+
+e2e-live: ## Cypress-e2e im Live-Modus gegen Agent + Magento (make demo zuerst starten)
+	bash scripts/e2e.sh --live
+
+cy-open: ## Cypress interaktiv oeffnen
+	cd frontend && npm run cy:open
 
 clean: demo-stop
 

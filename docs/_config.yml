@@ -1,0 +1,12 @@
+# Jekyll-Konfiguration fuer GitHub Pages (Deployment siehe .github/workflows/docs.yml).
+# Repo-Settings -> Pages -> Build and deployment -> Source: "GitHub Actions" (einmalig setzen).
+title: Magento 2 Agentic UI – Dokumentation
+description: arc42-Dokumentation des konversationellen Shop-Agenten auf Magento 2
+theme: minima
+markdown: kramdown
+lang: de
+header_pages:
+  - index.md
+  - arc42/index.md
+  - architecture.md
+  - roadmap.md

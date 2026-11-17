@@ -72,9 +72,14 @@ mutation RemoveItem($cart_id: String!, $item_id: Int!) {
 async def cart_get(client: MagentoClient, args: dict[str, Any]) -> dict[str, Any]:
     cart_id = args.get("cart_id")
     if not cart_id:
-        return {"intent": "cart", "cart": None, "message": "No cart yet."}
+        return {"intent": "cart", "cart": None, "message": "No cart yet.",
+                "narration": "Du hast noch keinen Warenkorb – ich kann gerne Produkte hineinlegen."}
     data = await client.execute(CART_QUERY, {"cart_id": cart_id})
-    return {"intent": "cart", "cart": data["cart"]}
+    cart = data["cart"]
+    return {"intent": "cart", "cart": cart,
+            "narration": f"Dein Warenkorb enthält aktuell {cart.get('total_quantity', 0)} Artikel "
+                         f"(Gesamt {cart.get('prices', {}).get('grand_total', {}).get('value', 0)} "
+                         f"{cart.get('prices', {}).get('grand_total', {}).get('currency', 'EUR')})."}
 
 
 async def cart_add(client: MagentoClient, args: dict[str, Any]) -> dict[str, Any]:
@@ -96,7 +101,13 @@ async def cart_add(client: MagentoClient, args: dict[str, Any]) -> dict[str, Any
             "qty": qty,
         })
     cart = data.get("addSimpleProductsToCart") or data.get("addConfigurableProductsToCart")
-    return {"intent": "cart_updated", "cart_id": cart_id, "cart": cart["cart"]}
+    return {
+        "intent": "cart_updated",
+        "cart_id": cart_id,
+        "cart": cart["cart"],
+        "narration": f"„{args['sku']}“ (Menge {qty}) liegt jetzt im Warenkorb – "
+                     "alle Summen kommen unverändert aus Magento.",
+    }
 
 
 async def cart_update(client: MagentoClient, args: dict[str, Any]) -> dict[str, Any]:
@@ -105,7 +116,8 @@ async def cart_update(client: MagentoClient, args: dict[str, Any]) -> dict[str, 
         "item_id": int(args["item_id"]),
         "qty": args.get("quantity", 1),
     })
-    return {"intent": "cart_updated", "cart_id": args["cart_id"], "cart": data["updateCartItems"]["cart"]}
+    return {"intent": "cart_updated", "cart_id": args["cart_id"], "cart": data["updateCartItems"]["cart"],
+            "narration": f"Menge von Position {args['item_id']} auf {args.get('quantity', 1)} geändert."}
 
 
 async def cart_remove(client: MagentoClient, args: dict[str, Any]) -> dict[str, Any]:
@@ -113,7 +125,8 @@ async def cart_remove(client: MagentoClient, args: dict[str, Any]) -> dict[str, 
         "cart_id": args["cart_id"],
         "item_id": int(args["item_id"]),
     })
-    return {"intent": "cart_updated", "cart_id": args["cart_id"], "cart": data["removeItemFromCart"]["cart"]}
+    return {"intent": "cart_updated", "cart_id": args["cart_id"], "cart": data["removeItemFromCart"]["cart"],
+            "narration": f"Position {args['item_id']} wurde aus dem Warenkorb entfernt."}
 
 
 def register_cart_tools(registry: ToolRegistry) -> None:  # noqa: F821

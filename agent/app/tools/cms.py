@@ -27,6 +27,7 @@ async def cms_page(client: MagentoClient, args: dict[str, Any]) -> dict[str, Any
         "title": page["title"],
         "url_key": page["url_key"],
         "excerpt": (page.get("content") or "")[:1500],
+        "narration": f"Ich habe die Infoseite „{page['title']}“ als Quelle herangezogen.",
     }
 
 

@@ -36,4 +36,17 @@ export default defineConfig({
       },
     },
   },
+  preview: {
+    // Port fuer die Cypress-e2e-Suite (scripts/e2e.sh startet `vite preview`)
+    host: true,
+    port: 4173,
+    strictPort: true,
+    proxy: {
+      '/api': {
+        target: process.env.AGENT_URL || 'http://localhost:8000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+    },
+  },
 })

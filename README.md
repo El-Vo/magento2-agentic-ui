@@ -31,7 +31,8 @@ frontend/               React/Vite-Chat-Widget mit UI-Komponenten (ProductCard, 
 magento-graphql-ext/    Skeleton für ein eigenes Magento-GraphQL-Modul (Lücken der Storefront-API)
 scripts/                Lokale Dev-Skripte – kein Docker: setup-local.sh (Toolchain), db.sh (MariaDB),
                         search.sh (Elasticsearch), magento.sh (php -S), agent.sh (uvicorn), seed-demo-data.php
-docs/                   Architektur- und Konzept-Dokumentation
+docs/                   arc42-Architekturdokumentation (docs/arc42/, veröffentlicht via GitHub Pages) + Konzept-Notizen
+frontend/cypress/       Cypress-e2e-Suite (Userflow, Live-Tool-Trace, Showcase-Grafiken)
 devcontainer/           Codespaces-/Devcontainer-Definition (ohne docker-in-docker)
 ```
 
@@ -86,20 +87,61 @@ Installationen entfernen: `make purge` (löscht `.local/` und `magento2/`).
 Ohne `MISTRAL_API_KEY` läuft der Agent im **Mock-Modus** (regelbasierte Tool-Auswahl) – nützlich für
 UI- und Magento-Integrationstests ohne LLM-Kosten.
 
-## Agent-Tools (MVP)
+## Agent-Tools
 
 | Tool | Magento-GraphQL-Basis | Phase |
 | --- | --- | --- |
-| `search_products` | `products(search:, filter:, pageSize:)` + `aggregations` | browse |
+| `search_products` | `products(search:, filter:, pageSize:)` + `aggregations` + `media_gallery` | browse |
 | `product_details` | `products` mit `attributes`, `media_gallery` | browse |
 | `categories` | `categories` (Kontext/Navigation) | browse |
 | `cart_get` | `cart` query (Totals live aus Magento) | cart |
 | `cart_add` | `createEmptyCart`, `addSimpleProductsToCart`, `addConfigurableProductsToCart` | cart (Confirm-Gate) |
 | `cart_update` / `cart_remove` | `updateCartItems`, `removeItemFromCart` | cart (Confirm-Gate) |
+| `checkout_overview` | `cart` inkl. `shipping_addresses`, `available_shipping_methods`, `available_payment_methods` | checkout |
+| `set_checkout_email` | `setGuestEmailOnCart` | checkout (Confirm-Gate) |
+| `set_shipping_address` | `setShippingAddressesOnCart` | checkout (Confirm-Gate) |
+| `set_shipping_method` | `setShippingMethodsOnCart` | checkout (Confirm-Gate) |
+| `set_payment_method` | `setPaymentMethodOnCart` (nur Code, z. B. `checkmo` – nie Zahlungsdaten) | checkout (Confirm-Gate) |
+| `place_order` | `placeOrder` → Bestellnummer | checkout (Confirm-Gate) |
+| `compose_showcase` | rendert serverseitig eine SVG-Grafik (hero/compare/moodboard/price_chart) aus den Produkten der letzten Suche | * (alle Phasen) |
 | `cms_page` | CMS-Pages/Blocks (RAG-Korpus, read-only) | support |
 
-Checkout-Kette (`setShippingAddressesOnCart` → `setShippingMethod` → `setPaymentMethod` → `placeOrder`)
-ist als Phase 2 vorgesehen, siehe `docs/roadmap.md` und `docs/architecture.md`.
+## Userflow, Transparenz & dynamische Grafiken
+
+- **Kompletter Userflow abgebildet:** Produktrecherche → Produktkarten → Warenkorb → Checkout
+  (Adresse → Versand → Zahlung → „Jetzt verbindlich bestellen“) → Bestellnummer. Agentengetrieben
+  über die Tool-Kette mit Confirm-Gate oder formularbasiert über den Widget-Checkout
+  (`GET /checkout/overview`, `POST /checkout/{address,shipping,payment,place}`).
+- **Der Agent beschreibt, was er tut:** Jedes Tool-Ergebnis trägt eine `narration`, zusätzlich
+  streamt `POST /chat/stream` (SSE) `text`-Events – im Chat steht also eine Erklärung, nicht nur ein Tool-Call.
+- **Live-Tool-Trace mit Parametern:** Der SSE-Stream liefert `tool_start`/`tool_end` mit
+  `tool`, `args` (JSON) und `status` – das Widget zeigt jeden Aufruf live mit Namen und exakten
+  Parametern an (`data-testid="tool-step"` / `tool-args`).
+- **Dynamische Grafiken:** Auf Wunsch („Erstelle einen Vergleich der Treffer“) ruft der Agent
+  `compose_showcase` auf und rendert eine Grafik (SVG) mit den Produkten in der Shopansicht –
+  Layout, Headline und Akzentfarbe wählt der Agent, alle Produktdaten kommen aus Magento
+  (XML-escaped, Farb-Whitelist, Bilder nur vom Magento-Host). Die Shopansicht wird so dynamisch
+  an die Wünsche des Nutzers angepasst.
+
+## e2e-Tests (Cypress)
+
+```bash
+make e2e        # Cypress gegen das gebaute Widget (vite preview :4173), Agent-API per cy.intercept gemockt
+make e2e-live   # Live-Modus gegen Agent + Magento (make demo zuerst starten; E2E_MOCK_API=false)
+```
+
+Specs in `frontend/cypress/e2e/`: `userflow.cy.ts` (kompletter Flow Recherche → Warenkorb → Checkout →
+Bestellung + Confirm-Gate), `tool-trace.cy.ts` (live Tool-Aufrufe mit Parametern + Narration),
+`showcase.cy.ts` (agenten-generierte Grafiken). CI: `.github/workflows/e2e.yml`.
+
+## Dokumentation (arc42) auf GitHub Pages
+
+Die vollständige Architekturdokumentation nach **arc42** liegt unter `docs/arc42/`
+(12 Kapitel: Ziele, Kontext, Bausteine, Laufzeitsicht, Verteilung, Querschnitt, ADRs, Qualität,
+Risiken, Glossar). Veröffentlichung über GitHub Pages: Workflow `.github/workflows/docs.yml`
+(Jekyll, `docs/_config.yml`) deployt bei jedem Push auf `main`, der `docs/` ändert.
+Einmalig in den Repo-Settings unter *Settings → Pages → Build and deployment → Source: „GitHub Actions“*
+setzen – danach liegt die Doku unter `https://<owner>.github.io/<repo>/`.
 
 ## Entwicklung
 
@@ -108,9 +150,11 @@ make setup          # einmalig: Toolchain + Magento lokal installieren
 make demo           # alle Dienste starten (db, elasticsearch, magento, agent)
 make ps             # Status aller Dienste
 make agent-dev      # Agent im Vordergrund mit Reload (uvicorn)
-make agent-test     # pytest (Tools gegen Fake-Gateway)
+make agent-test     # pytest (Tools, Confirm-Gate, SSE, Showcase gegen Fake-Gateway)
 make widget         # Frontend-Dev-Server
 make widget-build   # Production-Build des Widgets
+make e2e            # Cypress-e2e gegen das gebaute Widget (Agent-API gemockt)
+make e2e-live       # Cypress-e2e live gegen Agent + Magento (make demo zuerst)
 make demo-stop      # alle Dienste stoppen
 ```
 
@@ -148,5 +192,10 @@ Manuell lässt sich derselbe Ablauf jederzeit mit `make codespace` auslösen.
 
 ## Roadmap
 
-1. **MVP**: search/details/cart_add + Confirm-Gate + Chat-Widget neben dem Shop *(dieses Scaffolding)*
-2. Checkout-Kette als Tool-Abfolge mit Formular-Hybrid (kein Payment im LLM)
+1. **MVP**: search/details/cart_add + Confirm-Gate + Chat-Widget neben dem Shop ✅
+2. **Checkout-Kette** als Tool-Abfolge mit Formular-Hybrid (kein Payment im LLM) + Live-Tool-Trace (SSE)
+   + agenten-generierte Grafiken + Cypress-e2e + arc42-Doku auf GitHub Pages ✅
+3. Konto & Support: echtes Kunden-Login, Bestellstatus für Kunden, RAG mit Embeddings, DSGVO-Review
+4. Semantik & Personalisierung: Vektorindex (eigenes Modul `magento-graphql-ext`), personalisierte Vorschläge
+
+Details siehe `docs/roadmap.md` und `docs/arc42/`.

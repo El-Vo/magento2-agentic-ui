@@ -19,6 +19,8 @@ class Tool:
     parameters: dict[str, Any]
     phase: str = "browse"
     requires_confirmation: bool = False
+    # Handler receives (client, args, session) instead of (client, args)
+    uses_session: bool = False
     handler: Callable[..., Awaitable[dict[str, Any]]] | None = None
     _schema: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
 
