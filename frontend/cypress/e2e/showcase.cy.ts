@@ -31,7 +31,7 @@ describe('Agenten-generierte Produktgrafiken (Showcase)', () => {
 
     // Zugehörige Produktkarten inkl. "In den Warenkorb" unter der Grafik
     cy.get('[data-testid="showcase"] [data-testid="product-card"]').should('have.length', 3)
-    cy.get('[data-testid="showcase"] [data-testid="product-card"]').first().contains('button', 'In den Warenkorb').click()
+    cy.get('[data-testid="showcase"] [data-testid="product-card"]').first().contains('db-button', 'In den Warenkorb').click()
     cy.get('[data-testid="cart-badge"]').should('contain', '1')
   })
 
