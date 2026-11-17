@@ -8,11 +8,12 @@
   "forwardPorts": [3306, 5173, 8000, 8080, 9200],
   "portsAttributes": {
     "3306": { "label": "MariaDB (lokal, .local/mysql)" },
-    "5173": { "label": "Chat-Widget (Vite)" },
-    "8000": { "label": "Agent API (uvicorn)" },
-    "8080": { "label": "Magento Demo-Shop (php -S)" },
+    "5173": { "label": "Chat-Widget (Vite)", "onAutoForward": "openPreview" },
+    "8000": { "label": "Agent API (uvicorn)", "onAutoForward": "silent" },
+    "8080": { "label": "Magento Demo-Shop (php -S)", "onAutoForward": "openPreview" },
     "9200": { "label": "Elasticsearch (lokal)" }
   },
+  "updateContentCommand": "bash scripts/codespace-up.sh",
   "postCreateCommand": "bash scripts/codespace-up.sh",
   "postStartCommand": "bash scripts/codespace-up.sh",
   "postAttachCommand": "make ps",
@@ -21,7 +22,8 @@
       "extensions": [
         "ms-python.python",
         "dbaeumer.vscode-eslint",
-        "esbenp.prettier-vscode"
+        "esbenp.prettier-vscode",
+        "mistralai.mistral-vibe-code"
       ]
     }
   }

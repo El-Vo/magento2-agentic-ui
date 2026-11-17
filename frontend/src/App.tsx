@@ -6,26 +6,12 @@ import { CartView, CheckoutView, ConfirmDialog, FilterChips, PolicyAnswer, Produ
 
 const MAGENTO_URL = import.meta.env.VITE_MAGENTO_URL || 'http://localhost:8080'
 
-// Platzhalter für den Namen des eingeloggten Kunden (siehe UI-Sketch: „Hallo, X!“)
-const USER_NAME = 'X'
-
 type View = 'home' | 'cart' | 'checkout'
 
 interface Turn {
   role: 'user' | 'agent'
   text?: string
   intents?: Intent[]
-}
-
-// Neutrales Logo: Die DB-Marke (db-logo) ist lizenzrechtlich DB vorbehalten und
-// darf außerhalb von DB nicht verwendet werden.
-function LogoMark() {
-  return (
-    <svg className="logo-mark" width="44" height="32" viewBox="0 0 44 32" role="img" aria-label="Shop Logo">
-      <rect width="44" height="32" rx="4" fill="#ec0016" />
-      <text x="22" y="22.5" textAnchor="middle" fontFamily="Arial, sans-serif" fontWeight="700" fontSize="17" fill="#ffffff">DB</text>
-    </svg>
-  )
 }
 
 export default function App() {
@@ -77,10 +63,6 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <div className="brand">
-          <LogoMark />
-          <DbHeadline variant="1">Hallo, {USER_NAME}!</DbHeadline>
-        </div>
         <nav className="header-actions">
           <DbLink href={`${MAGENTO_URL}/customer/account/login`} target="_blank">Login</DbLink>
           <DbButton

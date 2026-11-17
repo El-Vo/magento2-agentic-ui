@@ -117,20 +117,33 @@ make demo-stop      # alle Dienste stoppen
 ## Devcontainer / Codespace
 
 Der Devcontainer (`devcontainer/devcontainer.json`) enthält **kein docker-in-docker**.
-**Beim Erstellen eines neuen Codespace startet automatisch alles** – `postCreateCommand` ruft
-`scripts/codespace-up.sh` auf, das idempotent folgendes erledigt:
+**Beim Erstellen eines neuen Codespace startet automatisch alles** – `updateContentCommand` ruft
+(außerdem von GitHub Prebuilds ausgeführt, siehe unten) `scripts/codespace-up.sh` auf, das idempotent
+folgendes erledigt:
 
 1. `.env` und `agent/.env` aus den Beispielen anlegen (ohne `MISTRAL_API_KEY` läuft der Agent im Mock-Modus),
 2. komplettes Setup, falls nötig: `scripts/setup-local.sh --all` (PHP/Composer/MariaDB via apt, Elasticsearch-Tarball, Magento 2 vom GitHub-Tag + Packagist),
 3. `npm install` im Frontend,
 4. alle Dienste starten: MariaDB, Elasticsearch, Magento (`php -S`, installiert und mit Demo-Daten geseedet beim ersten Lauf), Agent (uvicorn) und Chat-Widget (Vite im Hintergrund, `scripts/widget.sh`).
 
-`postStartCommand` ruft dasselbe Skript erneut auf – nach einem Codespace-Neustart sind die Dienste
-(deren Daten liegen unter `.local/` bzw. `magento2/` im Workspace) sofort wieder da. `postAttachCommand`
-zeigt den Status via `make ps`.
+Daneben installiert der Devcontainer die VS Code Extension **Mistral Vibe** (`mistralai.mistral-vibe-code`,
+siehe `customizations.vscode.extensions`). Die Extension bündelt den Agent selbst – keine separate
+CLI-Installation nötig; `vibe` läuft im Sidepanel mit Zugriff auf Workspace, Selektion und Diffs.
+`postCreateCommand`/`postStartCommand` rufen dasselbe
+idempotente Skript erneut auf – nach einem Codespace-Neustart sind die Dienste (deren Daten liegen unter
+`.local/` bzw. `magento2/` im Workspace) sofort wieder da. `postAttachCommand` zeigt den Status via `make ps`.
+
+**Schnelle Codespace-Erstellung:** Das schwere Setup liegt in `updateContentCommand`, weil GitHub Prebuilds
+nur `onCreateCommand`/`updateContentCommand` ausführen (nicht `postCreateCommand`). Prebuilds in den
+Repo-Settings unter *Settings → Codespaces → Prebuild* aktivieren – dann wird das komplette Setup
+(apt, Elasticsearch, Magento, composer, npm) einmalig im Prebuild gecached und neue Codespaces starten
+in Sekunden statt Minuten. Ohne Prebuild wiederholt sich das volle Setup bei jedem *Rebuild* des Containers.
 
 Alle Dienste binden an localhost und sind über die forwarded Ports 3306/5173/8000/8080/9200
-erreichbar – nach dem Erstellen direkt öffnen: **http://localhost:5173** (Chat-Widget).
+erreichbar – nach dem Erstellen direkt öffnen: **http://localhost:5173** (Chat-Widget, `onAutoForward: openPreview`).
+In GitHub Codespaces öffnet der Browser die URL `https://<codespace>-5173.app.github.dev`; dafür ist in
+`frontend/vite.config.ts` `server.allowedHosts` gesetzt (Vite >= 5.4 blockiert externe Host-Header sonst
+mit 403). Sichtbarkeit des Ports ggf. auf *public* stellen (`gh codespace ports visibility 5173 public`).
 Manuell lässt sich derselbe Ablauf jederzeit mit `make codespace` auslösen.
 
 ## Roadmap

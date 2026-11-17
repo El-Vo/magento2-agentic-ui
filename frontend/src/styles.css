@@ -45,10 +45,6 @@ button { font-family: inherit; }
   flex-shrink: 0;
 }
 
-.brand { display: flex; align-items: center; gap: var(--db-spacing-sm); }
-.brand db-headline { font-family: var(--db-font-family-headline); }
-.logo-mark { display: block; }
-
 .header-actions { display: flex; align-items: center; gap: var(--db-spacing-m); }
 
 .badge {
