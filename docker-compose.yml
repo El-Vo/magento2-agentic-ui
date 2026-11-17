@@ -1,0 +1,80 @@
+services:
+  db:
+    image: mariadb:10.6
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: magento
+      MYSQL_USER: magento
+      MYSQL_PASSWORD: magento
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  magento:
+    # Community demo image with Magento 2 Open Source + sample data.
+    # Replace with your own Magento instance by setting MAGENTO_IMAGE / MAGENTO_BASE_URL.
+    image: alexcheng/magento2:2.4.7-php8.2-apache
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MAGENTO_DB_HOST: db
+      MAGENTO_DB_NAME: magento
+      MAGENTO_DB_USER: magento
+      MAGENTO_DB_PASSWORD: magento
+      MAGENTO_URL: http://localhost:8080
+      MAGENTO_BACKEND_FRONTNAME: admin
+      MAGENTO_ADMIN_FIRSTNAME: Admin
+      MAGENTO_ADMIN_LASTNAME: User
+      MAGENTO_ADMIN_EMAIL: admin@example.com
+      MAGENTO_ADMIN_USER: admin
+      MAGENTO_ADMIN_PASSWORD: admin123
+      MAGENTO_SAMPLEDATA: "true"
+      MAGENTO_MODE: developer
+      PHP_MEMORY_LIMIT: 2G
+    ports:
+      - "8080:80"
+    volumes:
+      - magento-data:/var/www/html
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost/graphql?query={storeConfig{store_code}} || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 180s
+
+  agent:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    depends_on:
+      magento:
+        condition: service_healthy
+    environment:
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      AGENT_MODEL: ${AGENT_MODEL:-mistral-large-latest}
+      MAGENTO_BASE_URL: http://magento:8080
+      AGENT_ALLOWED_ORIGIN: ${AGENT_ALLOWED_ORIGIN:-http://localhost:5173}
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_MAGENTO_URL: ${MAGENTO_PUBLIC_URL:-http://localhost:8080}
+    depends_on:
+      - agent
+    environment:
+      AGENT_URL: http://agent:8000
+    ports:
+      - "5173:80"
+
+volumes:
+  db-data:
+  magento-data:
