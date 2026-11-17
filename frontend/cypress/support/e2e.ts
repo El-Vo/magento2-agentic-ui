@@ -121,12 +121,22 @@ function showcaseStream(layout = 'compare') {
 }
 
 function checkoutOverview(): Record<string, any> {
-  const cart: Record<string, any> = state.cart ?? {
+  const base: Record<string, any> = state.cart ?? {
     id: 'mockcart1',
     email: 'demo.kunde@agentic.local',
     total_quantity: 0,
     items: [],
     prices: { grand_total: { value: 0, currency: 'EUR' }, subtotal_including_tax: { value: 0, currency: 'EUR' } },
+  }
+  // Versand eingerechnet, sobald eine Versandart gewählt wurde (wie bei Magento im Cart-Total)
+  const subtotal = base.prices?.subtotal_including_tax?.value ?? 0
+  const shipping = state.shippingSet ? 4.95 : 0
+  const cart: Record<string, any> = {
+    ...base,
+    prices: {
+      ...base.prices,
+      grand_total: { value: subtotal + shipping, currency: 'EUR' },
+    },
   }
   return {
     intent: 'checkout',
@@ -251,6 +261,10 @@ before(() => {
   // E2E_MOCK_API=false -> Live-Lauf gegen echten Agent + Magento (make demo), sonst gemockte API
   cy.env(['E2E_MOCK_API']).then(({ E2E_MOCK_API }) => {
     mockApi = E2E_MOCK_API !== false && E2E_MOCK_API !== 'false'
-    if (mockApi) registerMockApi()
   })
+})
+
+// Intercepts pro Test neu registrieren (Cypress-Isolation zwischen Tests)
+beforeEach(() => {
+  if (mockApi) registerMockApi()
 })
