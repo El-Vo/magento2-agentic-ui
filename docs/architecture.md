@@ -61,9 +61,11 @@ Noch offen aus der Komponentenbibliothek: `CompareTray`, `AddressForm`, `Checkou
 
 ## Magento-Anbindung
 
-- Demo-Shop: `alexcheng/magento2` (Magento Open Source + Sample Data) via docker-compose.
-  Für einen echten Shop einfach `MAGENTO_BASE_URL` auf die Storefront-GraphQL-Endpunkt-URL zeigen,
-  statt des Demo-Containers.
+- Demo-Shop: Magento Open Source lokal, ohne Docker – Bezug als GitHub-Tag + Packagist
+  (`scripts/setup-local.sh`), betrieben mit `php -S` + `scripts/php-router.php` auf Port 8080,
+  MariaDB und Elasticsearch als lokale Prozesse unter `.local/` (`scripts/db.sh`, `scripts/search.sh`).
+  Demo-Daten kommen aus `scripts/seed-demo-data.php` (kein Marketplace-Login nötig).
+  Für einen echten Shop einfach `MAGENTO_BASE_URL` auf dessen Storefront-URL zeigen.
 - Lücken der Storefront-API (Bestellstatus nach placeOrder, semantische Suche) werden im
   eigenen Modul `magento-graphql-ext/` ergänzt (Skeleton vorhanden).
 

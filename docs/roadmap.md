@@ -7,7 +7,7 @@
 - [x] Confirm-Gate für alle Mutationen
 - [x] Session-Store mit `last_results` (Positions-Auflösung)
 - [x] Chat-Widget: ProductCard, FilterChips, CartPanel, ConfirmDialog, PolicyAnswer
-- [x] Magento-Demo-Shop via docker-compose, Codespace-fähig (Devcontainer)
+- [x] Magento-Demo-Shop lokal ohne Docker (php -S + MariaDB + Elasticsearch via `scripts/`, Devcontainer ohne docker-in-docker)
 - [x] Mock-Modus ohne LLM-Kosten
 - [ ] LLM-Prompt-Tuning für Filterübersetzung („wasserdicht unter 150 €“ → `price.lt` + Attribute)
 

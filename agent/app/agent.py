@@ -38,6 +38,15 @@ Rules:
 """
 
 
+def _content_text(content: Any) -> str:
+    """AssistantMessage.content is a plain string or a list of content chunks (mistralai 3.x)."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(getattr(c, "text", "") for c in content if getattr(c, "type", "text") == "text")
+    return ""
+
+
 class AgentService:
     def __init__(self, registry: ToolRegistry) -> None:
         self.registry = registry
@@ -64,12 +73,15 @@ class AgentService:
             choice = response.choices[0]
             msg = choice.message
             if msg.content:
-                text_parts.append(msg.content)
+                text_parts.append(_content_text(msg.content))
             if msg.tool_calls:
                 messages.append(msg.model_dump())
                 for call in msg.tool_calls:
-                    args = json.loads(call.function.arguments or "{}")
-                    result = await self._dispatch(session, call.name, args)
+                    # mistralai >= 3.x: tool name lives at call.function.name;
+                    # arguments is a JSON string or already a dict.
+                    raw_args = call.function.arguments or "{}"
+                    args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+                    result = await self._dispatch(session, call.function.name, args)
                     intents.append(result)
                     messages.append({
                         "role": "tool",

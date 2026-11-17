@@ -73,3 +73,70 @@ async def test_session_resolves_positions():
     session.last_results = [{"sku": "a"}, {"sku": "b"}]
     assert session.resolve_position(2)["sku"] == "b"
     assert session.resolve_position(3) is None
+
+
+def _completion(tool_calls=None, content=None):
+    """Build a real mistralai 3.x ChatCompletionResponse for the stubbed client."""
+    from mistralai.client.models import (
+        AssistantMessage,
+        ChatCompletionChoice,
+        ChatCompletionResponse,
+        FunctionCall,
+        ToolCall,
+        UsageInfo,
+    )
+
+    calls = [
+        ToolCall(id=f"call_{i}", function=FunctionCall(name=c[0], arguments=c[1]))
+        for i, c in enumerate(tool_calls or [])
+    ]
+    message = AssistantMessage(role="assistant", content=content, tool_calls=calls or None)
+    choice = ChatCompletionChoice(finish_reason="tool_calls" if calls else "stop", index=0, message=message)
+    return ChatCompletionResponse(
+        id="chat-test",
+        object="chat.completion",
+        model="test-model",
+        created=0,
+        choices=[choice],
+        usage=UsageInfo(prompt_tokens=1, completion_tokens=1, total_tokens=2),
+    )
+
+
+class _StubChat:
+    def __init__(self, responses):
+        self._responses = list(responses)
+
+    def complete(self, **kwargs):  # mistralai 3.x: chat.complete is synchronous
+        return self._responses.pop(0)
+
+
+class _StubClient:
+    def __init__(self, responses):
+        self.chat = _StubChat(responses)
+
+
+@respx.mock
+async def test_llm_tool_call_loop_dispatches_via_function_name(monkeypatch):
+    """Regression: mistralai 3.x ToolCall has no .name – the tool name is call.function.name."""
+    respx.post("http://magento-test/graphql").mock(return_value=Response(200, json=SEARCH_RESPONSE))
+    from app.magento import MagentoClient
+
+    monkeypatch.setattr("app.agent.MagentoClient", lambda: MagentoClient("http://magento-test/graphql"))
+
+    registry = build_registry()
+    service = AgentService(registry)
+    service.client = _StubClient([
+        _completion(tool_calls=[
+            ("search_products", '{"search": "wanderschuh", "page_size": 4}'),  # arguments as JSON str
+            ("search_products", {"search": "schuh", "page_size": 2}),           # arguments as dict
+        ]),
+        _completion(content="Hier sind die Treffer."),
+    ])
+    session = Session()
+    result = await service._run_llm(session, "zeig mir wanderschuhe")
+
+    assert result["text"] == "Hier sind die Treffer."
+    product_lists = [i for i in result["intents"] if i["intent"] == "product_list"]
+    assert len(product_lists) == 2
+    assert product_lists[0]["results"][0]["sku"] == "hiking-boot-01"
+    assert session.last_results[0]["sku"] == "hiking-boot-01"

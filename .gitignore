@@ -7,3 +7,6 @@ __pycache__/
 .env
 *.log
 tsconfig.tsbuildinfo
+# lokale Laufzeit ohne Docker (scripts/setup-local.sh, db.sh, search.sh, magento.sh, agent.sh)
+.local/
+magento2/
