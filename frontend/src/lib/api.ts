@@ -197,7 +197,7 @@ export async function streamChat(
       onEvent(ev)
       if (ev.event === 'done' && ev.result) {
         final = {
-          session_id: sessionId ?? '',
+          session_id: (ev as { session_id?: string }).session_id ?? sessionId ?? '',
           text: ev.result.text,
           intents: ev.result.intents,
           tool_trace: ev.tool_trace ?? [],

@@ -112,7 +112,7 @@ async def chat_stream(req: ChatRequest) -> StreamingResponse:
         trace: list[dict[str, Any]] = []
         async for ev in agent.run_events(session, req.message, trace):
             if ev["event"] == "done":
-                yield f"event: done\ndata: {json.dumps({'result': ev['result'], 'tool_trace': trace}, default=str)}\n\n"
+                yield f"event: done\ndata: {json.dumps({'session_id': session.id, 'result': ev['result'], 'tool_trace': trace}, default=str)}\n\n"
             else:
                 yield f"event: {ev['event']}\ndata: {json.dumps(ev, default=str)}\n\n"
         session_store.save(session)

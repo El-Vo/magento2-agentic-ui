@@ -83,7 +83,7 @@ function searchStream(message: string) {
     { event: 'tool_start', data: { tool: 'search_products', args, narration: 'Ich durchsuche den Katalog nach „wasserdichte sachen“ mit Filter {"price":{"lt":"150"}} …' } },
     { event: 'tool_end', data: { tool: 'search_products', args, intent: 'product_list', narration: 'Ich habe im Katalog nach „wasserdichte sachen“ gesucht – 3 Treffer.' } },
     { event: 'text', data: { text } },
-    { event: 'done', data: { result: { text, intents: [listIntent] }, tool_trace: [{ tool: 'search_products', args, status: 'done', intent: 'product_list', narration: 'Ich habe im Katalog nach „wasserdichte sachen“ gesucht – 3 Treffer.' }] } },
+    { event: 'done', data: { session_id: 'mock-session', result: { text, intents: [listIntent] }, tool_trace: [{ tool: 'search_products', args, status: 'done', intent: 'product_list', narration: 'Ich habe im Katalog nach „wasserdichte sachen“ gesucht – 3 Treffer.' }] } },
   ])
 }
 
@@ -93,7 +93,7 @@ function confirmAddStream(sku: string) {
   return sse([
     { event: 'tool_start', data: { tool: 'cart_add', args, narration: `Ich lege „${sku}“ (Menge 1) in den Warenkorb – nach deiner Bestätigung …` } },
     { event: 'tool_end', data: { tool: 'cart_add', args, intent: 'confirm_required', narration: confirmIntent.narration } },
-    { event: 'done', data: { result: { text: confirmIntent.narration, intents: [confirmIntent] }, tool_trace: [{ tool: 'cart_add', args, status: 'confirm_required', intent: 'confirm_required', narration: confirmIntent.narration }] } },
+    { event: 'done', data: { session_id: 'mock-session', result: { text: confirmIntent.narration, intents: [confirmIntent] }, tool_trace: [{ tool: 'cart_add', args, status: 'confirm_required', intent: 'confirm_required', narration: confirmIntent.narration }] } },
   ])
 }
 
@@ -116,7 +116,7 @@ function showcaseStream(layout = 'compare') {
     { event: 'tool_start', data: { tool: 'compose_showcase', args, narration: `Ich erstelle eine Grafik („${layout}“) mit den gewählten Produkten …` } },
     { event: 'tool_end', data: { tool: 'compose_showcase', args, intent: 'ui_layout', narration: layoutIntent.narration } },
     { event: 'text', data: { text } },
-    { event: 'done', data: { result: { text, intents: [layoutIntent] }, tool_trace: [{ tool: 'compose_showcase', args, status: 'done', intent: 'ui_layout', narration: layoutIntent.narration }] } },
+    { event: 'done', data: { session_id: 'mock-session', result: { text, intents: [layoutIntent] }, tool_trace: [{ tool: 'compose_showcase', args, status: 'done', intent: 'ui_layout', narration: layoutIntent.narration }] } },
   ])
 }
 
