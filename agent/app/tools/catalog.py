@@ -19,6 +19,7 @@ PRODUCT_FIELDS = """
     name
     url_key
     stock_status
+    media_gallery { url label position }
     price_range {
       minimum_price { final_price { value currency } regular_price { value currency } }
     }
@@ -84,6 +85,14 @@ def _price(product: dict[str, Any]) -> dict[str, Any] | None:
         return None
 
 
+def _image(product: dict[str, Any]) -> str | None:
+    media = product.get("media_gallery") or []
+    for entry in sorted(media, key=lambda m: m.get("position") or 0):
+        if entry.get("url"):
+            return entry["url"]
+    return media[0].get("url") if media else None
+
+
 def _to_card(product: dict[str, Any], position: int) -> dict[str, Any]:
     return {
         "position": position,
@@ -93,6 +102,7 @@ def _to_card(product: dict[str, Any], position: int) -> dict[str, Any]:
         "price": _price(product),
         "stock_status": product.get("stock_status"),
         "url_key": product.get("url_key"),
+        "image": _image(product),
     }
 
 
@@ -105,11 +115,13 @@ async def search_products(client: MagentoClient, args: dict[str, Any]) -> dict[s
     data = await client.execute(SEARCH_QUERY, variables)
     products = data["products"]["items"] or []
     cards = [_to_card(p, i + 1) for i, p in enumerate(products)]
+    search = args.get("search") or "alle Produkte"
     return {
         "intent": "product_list",
         "results": cards,
         "total_count": data["products"]["total_count"],
         "aggregations": data["products"].get("aggregations") or [],
+        "narration": f"Ich habe im Katalog nach „{search}“ gesucht – {data['products']['total_count']} Treffer.",
     }
 
 
@@ -127,6 +139,7 @@ async def product_details(client: MagentoClient, args: dict[str, Any]) -> dict[s
     product = items[0]
     return {
         "intent": "product_details",
+        "narration": f"Ich lade die Details zu „{product.get('name')}“ (Preis, Lager, Medien – live aus Magento).",
         "product": {
             "sku": product.get("sku"),
             "uid": product.get("uid"),
@@ -142,7 +155,11 @@ async def product_details(client: MagentoClient, args: dict[str, Any]) -> dict[s
 
 async def categories(client: MagentoClient, args: dict[str, Any]) -> dict[str, Any]:
     data = await client.execute(CATEGORIES_QUERY)
-    return {"intent": "category_list", "categories": data["categories"]["items"]}
+    return {
+        "intent": "category_list",
+        "categories": data["categories"]["items"],
+        "narration": "Ich lade die Kategorien des Shops für die Navigation.",
+    }
 
 
 def register_catalog_tools(registry: ToolRegistry) -> None:  # noqa: F821

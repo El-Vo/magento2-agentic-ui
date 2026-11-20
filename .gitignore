@@ -10,3 +10,7 @@ tsconfig.tsbuildinfo
 # lokale Laufzeit ohne Docker (scripts/setup-local.sh, db.sh, search.sh, magento.sh, agent.sh)
 .local/
 magento2/
+# Cypress-Artefakte
+frontend/cypress/screenshots/
+frontend/cypress/videos/
+frontend/cypress/downloads/
