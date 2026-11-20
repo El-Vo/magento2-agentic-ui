@@ -16,7 +16,7 @@ from app.customer import ensure_customer, get_cached_token
 from app.magento import MagentoClient
 from app.session import session_store
 from app.tools import build_registry
-from app.tools.cart import CART_QUERY, cart_add
+from app.tools.cart import CART_QUERY, cart_add, normalize_cart
 from app.tools.checkout import (
     checkout_overview,
     place_order,
@@ -169,7 +169,7 @@ async def get_cart() -> dict[str, Any]:
     if not _customer_cart_id:
         return {"cart": None}
     data = await client.execute(CART_QUERY, {"cart_id": _customer_cart_id})
-    return {"cart": data["cart"]}
+    return {"cart": normalize_cart(data["cart"])}
 
 
 # ---------------------------------------------------------------- Checkout

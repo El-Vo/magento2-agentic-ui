@@ -36,6 +36,7 @@ Skeleton), `frontend/cypress/` (e2e), `docs/` (arc42 + Pages), `.github/workflow
 | Warenkorb-Tools | `app/tools/cart.py` | `cart_get`, `cart_add` (simple/configurable), `cart_update`, `cart_remove` – Mutationen nur über Confirm-Gate |
 | Checkout-Tools | `app/tools/checkout.py` | `checkout_overview`, `set_checkout_email`, `set_shipping_address`, `set_shipping_method`, `set_payment_method`, `place_order` |
 | Showcase-Tool | `app/tools/showcase.py` | `compose_showcase`: layout + Positionen → serverseitig gerendertes SVG (XML-escaped, Farb-Whitelist, Medien-URL nur vom Magento-Host) |
+| View-Tool | `app/tools/view.py` | `compose_view`: maßgeschneiderte Ansicht aus whitelist-validierten DB-UI-Blöcken (Headline/Text/Tags/Chips/Produktkarten/Showcase/Warenkorb/Aktionen) |
 | CMS-Tool | `app/tools/cms.py` | `cms_page` (RAG-Korpus für Versand/Retoure/Datenschutz) |
 | Magento-Gateway | `app/magento.py` | einziger GraphQL-Client; Store-Header, Bearer-Token; `createEmptyCart` |
 | Demo-Kunde | `app/customer.py` | `createCustomerV2` + `generateCustomerToken`, prozessweit gecacht – Agent handelt im Namen des Demo-Kunden |
@@ -46,8 +47,8 @@ Skeleton), `frontend/cypress/` (e2e), `docs/` (arc42 + Pages), `.github/workflow
 
 | Baustein | Datei | Verantwortung |
 | --- | --- | --- |
-| App-Shell | `src/App.tsx` | Chat-Pane + Widget-Pane; SSE-Streaming konsumieren; **ToolTrace** (Toolname + JSON-Args + Narration live); Confirm-Dialog; State (Cart, Widgets, Showcase, Order) |
-| Komponenten | `src/components/IntentRenderer.tsx` | `ProductCardView`, `FilterChips`, `ShowcaseView` (SVG-Grafik + Produktkarten), `CartView`, `CheckoutView` (Stepper: Adresse → Versand → Zahlung → Prüfen & bestellen), `OrderStatusCard`, `ConfirmDialog`, `PolicyAnswer` |
+| App-Shell | `src/App.tsx` | Chat-Pane (auto-scrollt bei neuen Nachrichten) + Widget-Pane (neueste nicht-konversationelle Übersicht ersetzt alte Widgets); SSE-Streaming; **ToolTrace** live; Confirm-Dialog; State (Cart, Overview, Order) |
+| Komponenten | `src/components/IntentRenderer.tsx` | `ProductCardView`, `FilterChips`, `ShowcaseView` (SVG-Grafik), `DynamicView` (agenten-gebaute DB-UI-Ansicht), `ProductDetailView`, `CartView` (sortierte Items), `CheckoutView` (Stepper), `OrderStatusCard`, `ConfirmDialog`, `PolicyAnswer` |
 | API-Client | `src/lib/api.ts` | `streamChat` (SSE-Parser), `sendChat`, `confirmAction`, Cart-/Checkout-Endpunkte, Typen |
 | e2e | `cypress/` | `userflow.cy.ts` (kompletter Flow), `tool-trace.cy.ts` (live Tools+Parameter), `showcase.cy.ts` (Grafiken); Mock-API per `cy.intercept` (default), Live-Modus via `E2E_MOCK_API=false` |
 

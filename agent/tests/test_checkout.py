@@ -290,3 +290,94 @@ async def test_mock_full_userflow_search_to_confirm(monkeypatch):
     assert r3["intent"] == "cart_updated"
     assert session.cart_id is not None
     assert session.phase == "cart"
+
+
+# ---------------------------------------------------------------- Cart-Bug
+
+
+def test_normalize_cart_sorts_items_stably_by_id():
+    from app.tools.cart import normalize_cart
+
+    cart = {"id": "c1", "total_quantity": 3, "items": [
+        {"id": 7, "product": {"sku": "B"}}, {"id": 2, "product": {"sku": "A"}}, {"id": 5, "product": {"sku": "C"}},
+    ]}
+    out = normalize_cart(cart)
+    assert [i["id"] for i in out["items"]] == [2, 5, 7]
+    assert normalize_cart(None) is None
+    # erneutes Sortieren ändert nichts (immer gleiche Reihenfolge)
+    assert [i["id"] for i in normalize_cart(out)["items"]] == [2, 5, 7]
+
+
+@respx.mock
+async def test_cart_add_returns_full_items(monkeypatch):
+    """Bugfix: Mutationen liefern items mit -> Badge und Warenkorbansicht konsistent."""
+    from app.magento import MagentoClient
+    from app.tools.cart import cart_add
+
+    add_response = {"data": {"addSimpleProductsToCart": {"cart": {
+        "id": "c1",
+        "total_quantity": 2,
+        "prices": {"grand_total": {"value": 298.0, "currency": "EUR"}, "subtotal_including_tax": {"value": 298.0, "currency": "EUR"}},
+        "items": [
+            {"id": 9, "uid": "u9", "product": {"sku": "B", "name": "B"}, "quantity": 1, "prices": {"row_total": {"value": 149.0, "currency": "EUR"}}},
+            {"id": 3, "uid": "u3", "product": {"sku": "A", "name": "A"}, "quantity": 1, "prices": {"row_total": {"value": 149.0, "currency": "EUR"}}},
+        ],
+    }}}}
+    respx.post("http://magento-test/graphql").mock(return_value=Response(200, json=add_response))
+    result = await cart_add(MagentoClient("http://magento-test/graphql"), {"cart_id": "c1", "sku": "B", "quantity": 1})
+    assert result["intent"] == "cart_updated"
+    assert [i["id"] for i in result["cart"]["items"]] == [3, 9]  # sortiert
+    assert result["cart"]["total_quantity"] == 2
+
+
+# ---------------------------------------------------------------- compose_view
+
+
+async def test_compose_view_validates_blocks_and_resolves_products():
+    from app.session import Session
+    from app.tools.view import compose_view
+
+    session = Session()
+    session.last_results = [
+        {"position": 1, "sku": "A", "name": "Produkt A", "price": {"value": 10.0, "currency": "EUR"}, "stock_status": "IN_STOCK"},
+        {"position": 2, "sku": "B", "name": "Produkt B", "price": {"value": 20.0, "currency": "EUR"}, "stock_status": "IN_STOCK"},
+    ]
+    result = await compose_view(None, {
+        "title": "Meine Seite",
+        "blocks": [
+            {"type": "headline", "text": "Hallo", "variant": "99"},          # -> variant default 2
+            {"type": "hack", "text": "<script>"},                              # unbekannter Typ -> verworfen
+            {"type": "product_cards", "positions": [2, 1]},
+            {"type": "showcase", "layout": "compare", "headline": "Vgl", "accent": "blau"},
+            {"type": "actions", "items": [
+                {"label": "A in den Warenkorb", "action": "add_to_cart", "position": 1},
+                {"label": "böse", "action": "delete_everything"},              # nicht whitelisted -> verworfen
+                {"label": "Cart", "action": "open_cart"},
+            ]},
+            {"type": "text", "text": "Fertig."},
+        ],
+    }, session)
+    assert result["intent"] == "ui_view"
+    types = [b["type"] for b in result["blocks"]]
+    assert types == ["headline", "product_cards", "showcase", "actions", "text"]
+    assert result["blocks"][0]["variant"] == "2"
+    assert [p["sku"] for p in result["blocks"][1]["products"]] == ["B", "A"]
+    assert result["blocks"][2]["svg"].startswith("<svg")
+    actions = result["blocks"][3]["items"]
+    assert [a["action"] for a in actions] == ["add_to_cart", "open_cart"]
+    assert actions[0]["sku"] == "A"
+
+
+async def test_compose_view_fallback_and_mock_branch():
+    from app.agent import AgentService
+    from app.session import Session
+    from app.tools import build_registry
+
+    session = Session()
+    session.last_results = [{"position": 1, "sku": "A", "name": "A", "price": {"value": 1, "currency": "EUR"}}]
+    service = AgentService(build_registry())
+    service.client = None
+    result = await service.run(session, "baue mir eine übersicht")
+    assert result["intents"][0]["intent"] == "ui_view"
+    assert result["tool_trace"][0]["tool"] == "compose_view"
+    assert result["tool_trace"][0]["args"]["blocks"]

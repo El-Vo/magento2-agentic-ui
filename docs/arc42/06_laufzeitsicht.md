@@ -62,7 +62,24 @@ UI:   ShowcaseView rendert das SVG in der Shopansicht + Produktkarten darunter
       (inkl. „In den Warenkorb“)
 ```
 
-## 6.5 Phasenmodell der Session
+## 6.5 Maßgeschneiderte Ansicht (compose_view) & Widget-Wechsel
+
+```
+Kunde: „Baue mir eine Übersichtsseite für die Treffer“
+Agent: compose_view(title, blocks=[headline, text, tags, product_cards, actions])
+     → Blocktypen/Varianten/Aktionen gegen Whitelist validiert, Produkt-Positionen
+       gegen last_results aufgelöst, Showcase-SVG serverseitig gerendert
+UI:   DynamicView rendert die Blöcke 1:1 als DB-UI-Komponenten im Widgetbereich
+      (ersetzt die alte Produktgrid-Ansicht); jede Produktkarte/Aktion hat einen
+      „In den Warenkorb“-Button
+```
+
+Warenkorb-Darstellung: Items werden serverseitig stabil nach Positions-id sortiert
+(`normalize_cart`), sodass Badge-Anzahl und Warenkorbansicht immer konsistent und
+in derselben Reihenfolge gerendert werden. Der Chat scrollt bei jeder neuen
+Nachricht/Live-Event automatisch nach unten.
+
+## 6.6 Phasenmodell der Session
 
 `browse` (Katalog-Tools) → nach Cart-Intent `cart` → nach Checkout-Übersicht `checkout` → nach
 `order_placed` zurück auf `browse` mit geleertem Warenkorb. Dem LLM werden pro Phase nur die

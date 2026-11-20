@@ -80,6 +80,38 @@ export interface OrderResult {
   narration?: string
 }
 
+/** Ein Baustein einer agenten-gebauten Ansicht (DB-UI-Komponenten, whitelist-serverseitig). */
+export interface ViewBlock {
+  type: 'headline' | 'text' | 'tags' | 'chips' | 'product_cards' | 'showcase' | 'cart_summary' | 'actions' | 'divider'
+  text?: string
+  variant?: string
+  items?: Array<Record<string, unknown>>
+  products?: ProductCard[]
+  layout?: string
+  headline?: string
+  note?: string
+  accent?: string
+  svg?: string
+}
+
+export interface UiView {
+  intent: 'ui_view'
+  title?: string
+  blocks?: ViewBlock[]
+  narration?: string
+}
+
+export interface ProductDetails {
+  sku?: string
+  uid?: string
+  name?: string
+  price?: Price
+  stock_status?: string
+  description?: string
+  media?: Array<{ url?: string; label?: string }>
+  variants?: unknown[]
+}
+
 export interface Intent {
   intent: string
   results?: ProductCard[]

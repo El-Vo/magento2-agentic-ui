@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { DbButton, DbHeadline, DbInput } from '@db-ui/react-elements'
-import type { ChatEvent, Intent, OrderResult, ProductCard, ToolStep, UiLayout } from './lib/api'
+import { DbButton, DbHeadline, DbInput, DbTag } from '@db-ui/react-elements'
+import type { Cart, ChatEvent, Intent, OrderResult, ProductDetails, UiLayout, UiView } from './lib/api'
 import { addToCart, confirmAction, getCart, streamChat } from './lib/api'
-import { CartView, CheckoutView, ConfirmDialog, FilterChips, OrderStatusCard, PolicyAnswer, ProductCardView, ShowcaseView } from './components/IntentRenderer'
+import { CartView, CheckoutView, ConfirmDialog, DynamicView, FilterChips, OrderStatusCard, PolicyAnswer, ProductCardView, ProductDetailView, ShowcaseView } from './components/IntentRenderer'
 
 const TOOL_LABELS: Record<string, string> = {
   search_products: 'Produktsuche',
@@ -19,10 +19,14 @@ const TOOL_LABELS: Record<string, string> = {
   set_payment_method: 'Zahlungsart',
   place_order: 'Bestellung aufgeben',
   compose_showcase: 'Grafik erstellen',
+  compose_view: 'Ansicht bauen',
   cms_page: 'Infoseite',
 }
 
 type View = 'home' | 'cart' | 'checkout'
+
+/** Nicht-konversationelle Uebersichten, die im Widgetbereich landen (ersetzen alte Widgets). */
+const OVERVIEW_INTENTS = new Set(['product_list', 'product_details', 'ui_layout', 'ui_view'])
 
 interface Turn {
   role: 'user' | 'agent'
@@ -30,6 +34,14 @@ interface Turn {
   intents?: Intent[]
   toolSteps?: ToolStep[]
   narrations?: string[]
+}
+
+interface ToolStep {
+  tool: string
+  args?: Record<string, unknown>
+  status?: string
+  intent?: string
+  narration?: string
 }
 
 /** Live-Anzeige der Tool-Aufrufe: Toolname + exakte Parameter + Narration des Agenten. */
@@ -57,14 +69,14 @@ export default function App() {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [turns, setTurns] = useState<Turn[]>([])
   const turnsRef = useRef<Turn[]>([])
+  const conversationRef = useRef<HTMLDivElement>(null)
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [pending, setPending] = useState<Intent | null>(null)
-  const [cart, setCart] = useState<Intent['cart']>(undefined)
+  const [cart, setCart] = useState<Cart | undefined>(undefined)
   const [view, setView] = useState<View>('home')
-  const [widgets, setWidgets] = useState<ProductCard[]>([])
-  const [aggregations, setAggregations] = useState<Intent['aggregations']>([])
-  const [showcase, setShowcase] = useState<UiLayout | null>(null)
+  // neueste nicht-konversationelle Uebersicht – ersetzt alte Widgets aus vergangenen Nachrichten
+  const [overview, setOverview] = useState<Intent | null>(null)
   const [order, setOrder] = useState<OrderResult | null>(null)
 
   const updateTurns = (fn: (prev: Turn[]) => Turn[]) => {
@@ -72,6 +84,12 @@ export default function App() {
     turnsRef.current = next
     setTurns(next)
   }
+
+  // Chat immer nach unten scrollen, sobald eine neue Nachricht (oder Live-Event) ansteht
+  useEffect(() => {
+    const el = conversationRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [turns, busy])
 
   useEffect(() => {
     getCart()
@@ -92,16 +110,21 @@ export default function App() {
     if (confirmIntent) setPending(confirmIntent)
     const cartIntent = intents?.find((i) => i.cart) ?? (intents?.find((i) => i.intent === 'cart') as Intent | undefined)
     if (cartIntent?.cart) setCart(cartIntent.cart)
-    const listIntent = intents?.find((i) => i.intent === 'product_list' && i.results?.length)
-    if (listIntent?.results) {
-      setWidgets(listIntent.results)
-      setAggregations(listIntent.aggregations ?? [])
+    // neueste Uebersicht gewinnt – alte Widgets werden entfernt
+    const overviewIntent = [...(intents ?? [])].reverse().find((i) => OVERVIEW_INTENTS.has(i.intent))
+    if (overviewIntent) {
+      setOverview(overviewIntent)
       setView('home')
     }
-    const layoutIntent = intents?.find((i) => i.intent === 'ui_layout')
-    if (layoutIntent) setShowcase(layoutIntent as unknown as UiLayout)
     const orderIntent = intents?.find((i) => i.intent === 'order_placed')
     if (orderIntent) setOrder(orderIntent as unknown as OrderResult)
+  }
+
+  async function refreshCart() {
+    try {
+      const res = await getCart()
+      if (res.cart) setCart(res.cart)
+    } catch { /* Badge/Antwort genuegt */ }
   }
 
   async function ask(message: string) {
@@ -146,6 +169,7 @@ export default function App() {
     try {
       const res = await addToCart(sku)
       if (res.cart) setCart(res.cart)
+      await refreshCart() // volle Items (Badge und Ansicht konsistent)
     } catch (e) {
       updateTurns((t) => [...t, { role: 'agent', text: `Fehler beim Hinzufügen: ${(e as Error).message}` }])
     }
@@ -158,6 +182,7 @@ export default function App() {
       const res = await confirmAction(sessionId, pending.tool!, pending.args ?? {})
       const cartIntent = res.intents?.find((i) => i.cart) ?? (res.cart ? { cart: res.cart } as Intent : undefined)
       if (cartIntent?.cart) setCart(cartIntent.cart)
+      await refreshCart()
       updateTurns((t) => [...t, {
         role: 'agent',
         text: res.text,
@@ -170,6 +195,47 @@ export default function App() {
       setBusy(false)
       setPending(null)
     }
+  }
+
+  function renderOverview(o: Intent) {
+    if (o.intent === 'product_list') {
+      return (
+        <div className="widget-section" data-testid="widget-products">
+          <DbHeadline variant="2">Vorschläge für dich</DbHeadline>
+          {o.aggregations && o.aggregations.length > 0 && (
+            <FilterChips aggregations={o.aggregations} onPick={(code, value) => ask(`Filter ${code} auf ${value} anwenden`)} />
+          )}
+          <div className="product-grid">
+            {(o.results ?? []).map((p) => <ProductCardView key={p.uid ?? p.sku} product={p} onAdd={handleAddToCart} />)}
+          </div>
+        </div>
+      )
+    }
+    if (o.intent === 'product_details') {
+      return <ProductDetailView product={o.product as unknown as ProductDetails} onAdd={handleAddToCart} />
+    }
+    if (o.intent === 'ui_layout') {
+      return (
+        <div className="widget-section">
+          <ShowcaseView layout={o as unknown as UiLayout} onAdd={handleAddToCart} />
+        </div>
+      )
+    }
+    if (o.intent === 'ui_view') {
+      return (
+        <div className="widget-section">
+          <DynamicView
+            view={o as unknown as UiView}
+            cart={cart}
+            onAdd={handleAddToCart}
+            onOpenCart={() => setView('cart')}
+            onCheckout={() => setView('checkout')}
+            onChip={(code, value) => ask(`Filter ${code} auf ${value} anwenden`)}
+          />
+        </div>
+      )
+    }
+    return null
   }
 
   return (
@@ -190,9 +256,9 @@ export default function App() {
       <div className="app-body">
         <aside className="chat-pane">
           <div className="pane-title">Chatfenster</div>
-          <div className="conversation" data-testid="conversation">
+          <div className="conversation" data-testid="conversation" ref={conversationRef}>
             {turns.length === 0 && (
-              <p className="hint">Frag z. B.: „Zeig mir wasserdichte Sachen unter 150 €“ oder „Erstelle einen Vergleich der Treffer“</p>
+              <p className="hint">Frag z. B.: „Zeig mir wasserdichte Sachen unter 150 €“, „Erstelle einen Vergleich der Treffer“ oder „Baue mir eine Übersichtsseite“</p>
             )}
             {turns.map((turn, i) => (
               <div key={i} className={`turn ${turn.role}`}>
@@ -207,12 +273,10 @@ export default function App() {
                   if (intent.intent === 'confirm_required') {
                     return null
                   }
-                  if (intent.intent === 'product_details') {
-                    return <div key={j} className="intent-block"><pre>{JSON.stringify(intent.product, null, 2)}</pre></div>
-                  }
                   if (intent.intent === 'policy_answer') {
                     return <PolicyAnswer key={j} intent={intent} />
                   }
+                  // Uebersichten (product_list/product_details/ui_layout/ui_view) landen im Widgetbereich
                   return null
                 })}
               </div>
@@ -243,28 +307,13 @@ export default function App() {
           {view === 'home' && (
             order ? (
               <OrderStatusCard order={order} onClose={() => { setOrder(null); setCart(undefined); setView('home') }} />
+            ) : overview ? (
+              renderOverview(overview)
             ) : (
-              <>
-                {showcase && <div className="widget-section"><ShowcaseView layout={showcase} onAdd={handleAddToCart} /></div>}
-                {widgets.length > 0 ? (
-                  <div className="widget-section" data-testid="widget-products">
-                    <DbHeadline variant="2">Vorschläge für dich</DbHeadline>
-                    {aggregations && aggregations.length > 0 && (
-                      <FilterChips aggregations={aggregations} onPick={(code, value) => ask(`Filter ${code} auf ${value} anwenden`)} />
-                    )}
-                    <div className="product-grid">
-                      {widgets.map((p) => <ProductCardView key={p.uid ?? p.sku} product={p} onAdd={handleAddToCart} />)}
-                    </div>
-                  </div>
-                ) : (
-                  !showcase && (
-                    <div className="widget-placeholder">
-                      <strong>Platz für Widgets</strong>
-                      <span>Stell eine Frage im Chatfenster – Produktkarten, Grafiken, Warenkorb und Checkout erscheinen hier.</span>
-                    </div>
-                  )
-                )}
-              </>
+              <div className="widget-placeholder">
+                <strong>Platz für Widgets</strong>
+                <span>Stell eine Frage im Chatfenster – Produktkarten, Grafiken, Ansichten, Warenkorb und Checkout erscheinen hier.</span>
+              </div>
             )
           )}
           {view === 'cart' && (

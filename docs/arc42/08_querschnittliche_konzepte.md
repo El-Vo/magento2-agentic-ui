@@ -33,9 +33,12 @@ nur Tool-Calls anzuzeigen. Gleiches Protokoll im Mock-Modus (regelbasiert), dadu
 ## 8.3 UI-Intents & dynamische Shopansicht
 
 Der Agent antwortet mit strukturierten Intents, die dedizierte Komponenten rendern:
-`product_list` (Karten + Filter-Chips), `cart`/`cart_updated` (Warenkorb-Panel), `checkout`,
-`order_placed` (Bestellkarte), `confirm_required` (Confirm-Dialog), `ui_layout` (**Showcase-Grafik**),
-`policy_answer` (CMS-Quelle). Die Shopansicht passt sich so dynamisch an die Wünsche des Kunden an.
+`product_list` (Karten + Filter-Chips), `product_details` (Detailansicht mit Add-to-Cart),
+`cart`/`cart_updated` (Warenkorb-Panel), `checkout`, `order_placed` (Bestellkarte),
+`confirm_required` (Confirm-Dialog), `ui_layout` (**Showcase-Grafik**), `ui_view`
+(**agenten-gebaute DB-UI-Ansicht**), `policy_answer` (CMS-Quelle). Nicht-konversationelle
+Übersichten erscheinen im Widgetbereich und ersetzen dort die vorherige Ansicht; der Chat
+zeigt nur Konversation (Text, Narration, Tool-Trace, Confirm, Policy) und scrollt auto. nach unten.
 
 ## 8.4 Sessions & Memory
 

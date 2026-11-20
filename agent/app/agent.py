@@ -65,6 +65,7 @@ _NARRATIONS = {
     "set_payment_method": lambda a: f"Ich wähle die Zahlungsart „{a.get('code')}“ (Zahlungsdaten bleiben im Formular, nie im Chat) …",
     "place_order": lambda a: "Ich gebe die Bestellung jetzt verbindlich auf …",
     "compose_showcase": lambda a: f"Ich erstelle eine Grafik („{a.get('layout')}“) mit den gewählten Produkten …",
+    "compose_view": lambda a: f"Ich baue eine maßgeschneiderte Ansicht „{a.get('title')}“ mit DB-UI-Bausteinen …",
     "cms_page": lambda a: "Ich suche die passende Infoseite …",
 }
 
@@ -210,6 +211,19 @@ class AgentService:
         if any(k in low for k in ("vergleich", "grafik", "showcase", "moodboard", "plakat", "visualisierung", "preisvergleich", "chart")):
             layout = "moodboard" if "moodboard" in low else ("compare" if ("vergleich" in low or "chart" in low) else ("price_chart" if "preis" in low else "hero"))
             async for _ev in run_tool("compose_showcase", {"layout": layout, "headline": "Deine Auswahl"}):
+                yield _ev
+        # Massgeschneiderte Ansicht aus DB-UI-Bausteinen
+        elif any(k in low for k in ("übersicht", "uebersicht", "ansicht", "dashboard", "gestalte", "baue mir")):
+            blocks = [
+                {"type": "headline", "text": "Deine Übersicht", "variant": "2"},
+                {"type": "text", "text": "Vom Agenten aus deiner letzten Suche zusammengestellt."},
+                {"type": "product_cards", "positions": [1, 2, 3]},
+                {"type": "actions", "items": [
+                    {"label": "Erstes in den Warenkorb", "action": "add_to_cart", "position": 1},
+                    {"label": "Warenkorb öffnen", "action": "open_cart"},
+                ]},
+            ]
+            async for _ev in run_tool("compose_view", {"title": "Deine Übersicht", "blocks": blocks}):
                 yield _ev
         # Warenkorb anzeigen
         elif "warenkorb" in low and any(k in low for k in ("zeig", "anzeigen", "sehen", "öffne", "open", "show")):

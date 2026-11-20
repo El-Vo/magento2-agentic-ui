@@ -69,10 +69,40 @@ beforeEach(() => {
 })
 
 function cartWithItems() {
-  const items = state.cart ? (state.cart as { items: unknown[] }).items : []
   return state.cart
-    ? state.cart
-    : { id: 'mockcart1', total_quantity: items.length ? 1 : 0, items, prices: { grand_total: { value: 0, currency: 'EUR' } } }
+}
+
+function addToCartMock(sku: string, quantity: number) {
+  const product = PRODUCTS.find((p) => p.sku === sku) ?? PRODUCTS[0]
+  const cart: Record<string, any> = state.cart ?? {
+    id: 'mockcart1',
+    email: 'demo.kunde@agentic.local',
+    items: [],
+    prices: { grand_total: { value: 0, currency: 'EUR' }, subtotal_including_tax: { value: 0, currency: 'EUR' } },
+  }
+  cart.items = cart.items ?? []
+  const existing = cart.items.find((i: any) => i.product.sku === product.sku)
+  if (existing) {
+    existing.quantity += quantity
+  } else {
+    cart.items.push({
+      id: cart.items.length + 1,
+      uid: `u${cart.items.length + 1}`,
+      product: { sku: product.sku, name: product.name },
+      quantity,
+      prices: { row_total: product.price, price: product.price },
+    })
+  }
+  // wie im echten Backend: stabil nach item-id sortiert, Totals konsistent
+  cart.items.sort((a: any, b: any) => a.id - b.id)
+  cart.total_quantity = cart.items.reduce((s: number, i: any) => s + i.quantity, 0)
+  const subtotal = cart.items.reduce((s: number, i: any) => s + i.prices.row_total.value * i.quantity, 0)
+  cart.prices = {
+    subtotal_including_tax: { value: subtotal, currency: 'EUR' },
+    grand_total: { value: subtotal, currency: 'EUR' },
+  }
+  state.cart = cart
+  return cart
 }
 
 function searchStream(message: string) {
@@ -94,6 +124,47 @@ function confirmAddStream(sku: string) {
     { event: 'tool_start', data: { tool: 'cart_add', args, narration: `Ich lege „${sku}“ (Menge 1) in den Warenkorb – nach deiner Bestätigung …` } },
     { event: 'tool_end', data: { tool: 'cart_add', args, intent: 'confirm_required', narration: confirmIntent.narration } },
     { event: 'done', data: { session_id: 'mock-session', result: { text: confirmIntent.narration, intents: [confirmIntent] }, tool_trace: [{ tool: 'cart_add', args, status: 'confirm_required', intent: 'confirm_required', narration: confirmIntent.narration }] } },
+  ])
+}
+
+function viewStream() {
+  const args = {
+    title: 'Deine Übersicht',
+    blocks: [
+      { type: 'headline', text: 'Deine Übersicht', variant: '2' },
+      { type: 'text', text: 'Vom Agenten aus deiner letzten Suche zusammengestellt.' },
+      { type: 'tags', items: [{ label: 'KI-generiert', variant: 'informative' }] },
+      { type: 'product_cards', positions: [1, 2, 3] },
+      {
+        type: 'actions',
+        items: [
+          { label: 'Erstes in den Warenkorb', action: 'add_to_cart', position: 1, sku: PRODUCTS[0].sku, name: PRODUCTS[0].name },
+          { label: 'Warenkorb öffnen', action: 'open_cart' },
+        ],
+      },
+    ],
+  }
+  const blocks = [
+    { type: 'headline', text: 'Deine Übersicht', variant: '2' },
+    { type: 'text', text: 'Vom Agenten aus deiner letzten Suche zusammengestellt.' },
+    { type: 'tags', items: [{ label: 'KI-generiert', variant: 'informative' }] },
+    { type: 'product_cards', products: PRODUCTS },
+    {
+      type: 'actions',
+      items: [
+        { label: 'Erstes in den Warenkorb', action: 'add_to_cart', sku: PRODUCTS[0].sku, name: PRODUCTS[0].name },
+        { label: 'Warenkorb öffnen', action: 'open_cart' },
+      ],
+    },
+  ]
+  const narration = 'Ich habe eine maßgeschneiderte Ansicht „Deine Übersicht“ mit 5 Bausteinen (DB-UI-Komponenten) zusammengestellt – Produktdaten kommen aus Magento.'
+  const viewIntent = { intent: 'ui_view', title: 'Deine Übersicht', blocks, narration }
+  const text = narration
+  return sse([
+    { event: 'tool_start', data: { tool: 'compose_view', args, narration: 'Ich baue eine maßgeschneiderte Ansicht „Deine Übersicht“ mit DB-UI-Bausteinen …' } },
+    { event: 'tool_end', data: { tool: 'compose_view', args, intent: 'ui_view', narration } },
+    { event: 'text', data: { text } },
+    { event: 'done', data: { session_id: 'mock-session', result: { text, intents: [viewIntent] }, tool_trace: [{ tool: 'compose_view', args, status: 'done', intent: 'ui_view', narration }] } },
   ])
 }
 
@@ -163,6 +234,8 @@ function registerMockApi() {
     let body: string
     if (message.includes('vergleich') || message.includes('grafik') || message.includes('showcase') || message.includes('moodboard')) {
       body = showcaseStream(message.includes('moodboard') ? 'moodboard' : 'compare')
+    } else if (message.includes('übersicht') || message.includes('uebersicht') || message.includes('ansicht') || message.includes('dashboard') || message.includes('gestalte') || message.includes('baue mir')) {
+      body = viewStream()
     } else if (message.includes('warenkorb') && (message.includes('erste') || message.includes('hinzufügen') || message.includes('legen'))) {
       body = confirmAddStream('BE-JACKE-03')
     } else {
@@ -186,12 +259,7 @@ function registerMockApi() {
 
   cy.intercept('POST', '**/api/confirm', (req) => {
     const tool = req.body?.tool
-    state.cart = {
-      id: 'mockcart1',
-      total_quantity: 1,
-      items: [{ id: 1, uid: 'u1', product: { sku: 'BE-JACKE-03', name: 'Wasserdichte Outdoor-Jacke' }, quantity: 1, prices: { row_total: { value: 149.0, currency: 'EUR' }, price: { value: 149.0, currency: 'EUR' } } }],
-      prices: { grand_total: { value: 149.0, currency: 'EUR' }, subtotal_including_tax: { value: 149.0, currency: 'EUR' } },
-    }
+    state.cart = addToCartMock(String(req.body?.args?.sku ?? 'BE-JACKE-03'), 1)
     req.reply({
       statusCode: 200,
       body: {
@@ -204,15 +272,8 @@ function registerMockApi() {
   })
 
   cy.intercept('POST', '**/api/cart/add', (req) => {
-    const sku = req.body?.sku ?? PRODUCTS[0].sku
-    const product = PRODUCTS.find((p) => p.sku === sku) ?? PRODUCTS[0]
-    state.cart = {
-      id: 'mockcart1',
-      total_quantity: 1,
-      items: [{ id: 1, uid: 'u1', product: { sku: product.sku, name: product.name }, quantity: req.body?.quantity ?? 1, prices: { row_total: product.price, price: product.price } }],
-      prices: { grand_total: product.price, subtotal_including_tax: product.price },
-    }
-    req.reply({ statusCode: 200, body: { cart: state.cart } })
+    const cart = addToCartMock(req.body?.sku ?? PRODUCTS[0].sku, req.body?.quantity ?? 1)
+    req.reply({ statusCode: 200, body: { cart } })
   })
 
   cy.intercept('GET', '**/api/cart', (req) => {

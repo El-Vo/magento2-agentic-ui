@@ -8,8 +8,11 @@ import type {
   OrderResult,
   PaymentMethod,
   ProductCard,
+  ProductDetails,
   ShippingMethod,
   UiLayout,
+  UiView,
+  ViewBlock,
 } from '../lib/api'
 import {
   formatPrice,
@@ -90,12 +93,163 @@ export function ShowcaseView({ layout, onAdd }: { layout: UiLayout; onAdd?: (sku
   )
 }
 
+/** Produktdetail – Uebersicht landet im Widgetbereich, immer mit Add-to-Cart-Button. */
+export function ProductDetailView({ product, onAdd }: { product?: ProductDetails; onAdd?: (sku: string) => void }) {
+  if (!product) return null
+  const inStock = product.stock_status === 'IN_STOCK'
+  const image = product.media?.find((m) => m.url)?.url
+  // Beschreibung ist untrusted (Prompt-Injection) -> als Text rendern, keine HTML-Ausfuehrung
+  const description = (product.description ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+  return (
+    <div className="card product-detail" data-testid="product-detail">
+      <DbHeadline variant="2">{product.name}</DbHeadline>
+      <div className="product-detail-body">
+        {image && <img className="product-detail-img" src={image} alt={product.name ?? ''} loading="lazy" />}
+        <div className="product-detail-info">
+          <span className="product-sku">{product.sku}</span>
+          <DbTag variant={inStock ? 'success' : 'error'} small>{inStock ? 'Auf Lager' : 'Nicht verfügbar'}</DbTag>
+          <span className="product-price">{formatPrice(product.price)}</span>
+          {description && <p className="product-description">{description}</p>}
+          {onAdd && (
+            <DbButton variant="primary" disabled={!inStock} onClick={() => onAdd(product.sku ?? '')}>
+              In den Warenkorb
+            </DbButton>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Vom Agenten gebaute Ansicht: DB-UI-Bausteine (Whitelist serverseitig validiert). */
+export function DynamicView({ view, cart, onAdd, onOpenCart, onCheckout, onChip }: {
+  view: UiView
+  cart?: Cart
+  onAdd?: (sku: string) => void
+  onOpenCart?: () => void
+  onCheckout?: () => void
+  onChip?: (code: string, value: string) => void
+}) {
+  const renderBlock = (b: ViewBlock, i: number) => {
+    switch (b.type) {
+      case 'headline':
+        return <DbHeadline key={i} variant={(b.variant ?? '2') as '1' | '2' | '3' | '4' | '5' | '6'}>{b.text}</DbHeadline>
+      case 'text':
+        return <p key={i} className="dv-text">{b.text}</p>
+      case 'tags':
+        return (
+          <div key={i} className="dv-tags">
+            {(b.items ?? []).map((t, j) => (
+              <DbTag key={j} variant={(t.variant as 'success' | 'error' | 'warning' | 'informative' | 'light') ?? 'light'} small>
+                {String(t.label ?? '')}
+              </DbTag>
+            ))}
+          </div>
+        )
+      case 'chips':
+        return (
+          <div key={i} className="filter-chips" data-testid="view-chips">
+            {(b.items ?? []).map((c, j) => (
+              <DbChip
+                key={j}
+                interactiontype="filter"
+                onClick={() => c.filter_code && c.filter_value && onChip?.(String(c.filter_code), String(c.filter_value))}
+              >
+                {String(c.label ?? '')}
+              </DbChip>
+            ))}
+          </div>
+        )
+      case 'product_cards':
+        return (
+          <div key={i} className="product-grid" data-testid="view-product-cards">
+            {(b.products ?? []).map((p) => <ProductCardView key={p.uid ?? p.sku} product={p} onAdd={onAdd} />)}
+          </div>
+        )
+      case 'showcase':
+        return (
+          <div key={i} className="showcase" data-testid="view-showcase">
+            {b.headline && <DbHeadline variant="3">{b.headline}</DbHeadline>}
+            {b.svg && (
+              <div className="showcase-svg" data-testid="showcase-svg" role="img" aria-label={b.headline ?? 'Grafik'} dangerouslySetInnerHTML={{ __html: b.svg }} />
+            )}
+            {b.products && b.products.length > 0 && (
+              <div className="product-grid showcase-products">
+                {b.products.map((p) => <ProductCardView key={p.uid ?? p.sku} product={p} onAdd={onAdd} />)}
+              </div>
+            )}
+          </div>
+        )
+      case 'cart_summary': {
+        const items = [...(cart?.items ?? [])].sort((a, b) => (a.id ?? 0) - (b.id ?? 0))
+        return (
+          <div key={i} className="card dv-cart" data-testid="view-cart-summary">
+            <h3>Warenkorb</h3>
+            {items.length === 0 ? (
+              <p className="empty-note">Noch leer.</p>
+            ) : (
+              <div className="cart-list">
+                {items.map((item) => (
+                  <div key={item.id} className="cart-item">
+                    <span><span className="qty">{item.quantity}×</span>{item.product.name}</span>
+                    <span className="row-total">{formatPrice(item.prices?.row_total)}</span>
+                  </div>
+                ))}
+                <div className="cart-item grand">
+                  <span>Gesamt</span>
+                  <span>{formatPrice(cart?.prices?.grand_total)}</span>
+                </div>
+              </div>
+            )}
+            <div className="pane-footer">
+              <DbButton variant="secondary-outline" onClick={onOpenCart}>Warenkorb öffnen</DbButton>
+              <DbButton variant="primary" disabled={!items.length} onClick={onCheckout}>Checkout</DbButton>
+            </div>
+          </div>
+        )
+      }
+      case 'actions':
+        return (
+          <div key={i} className="dv-actions" data-testid="view-actions">
+            {(b.items ?? []).map((a, j) => (
+              <DbButton
+                key={j}
+                variant={a.action === 'add_to_cart' ? 'primary' : 'secondary-outline'}
+                onClick={() => {
+                  if (a.action === 'add_to_cart' && a.sku) onAdd?.(String(a.sku))
+                  if (a.action === 'open_cart') onOpenCart?.()
+                  if (a.action === 'checkout') onCheckout?.()
+                }}
+              >
+                {String(a.label ?? a.action)}
+              </DbButton>
+            ))}
+          </div>
+        )
+      case 'divider':
+        return <hr key={i} className="dv-divider" />
+      default:
+        return null
+    }
+  }
+  return (
+    <div className="dynamic-view" data-testid="dynamic-view">
+      <div className="showcase-head">
+        <DbHeadline variant="2">{view.title ?? 'Ansicht'}</DbHeadline>
+        <DbTag variant="informative" small>Vom Agenten mit DB-UI-Bausteinen gebaut</DbTag>
+      </div>
+      {(view.blocks ?? []).map((b, i) => renderBlock(b, i))}
+    </div>
+  )
+}
+
 export function CartView({ cart, onCheckout, onClose }: {
   cart?: Cart
   onCheckout: () => void
   onClose: () => void
 }) {
-  const items = cart?.items ?? []
+  // immer gleiche, geordnete Darstellung: stabil nach Positions-id sortiert
+  const items = [...(cart?.items ?? [])].sort((a, b) => (a.id ?? 0) - (b.id ?? 0))
   return (
     <div>
       <DbHeadline variant="2">Warenkorb{cart ? ` (${cart.total_quantity})` : ''}</DbHeadline>

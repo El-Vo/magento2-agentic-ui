@@ -28,13 +28,17 @@ frontend (React/Vite)          agent (FastAPI)                     magento (Demo
   ein kleiner GraphQL-Consumer, der exakt die Felder der UI-Komponenten abfragt (inkl.
   `aggregations` für Filter-Chips und `media_gallery` für Produktbilder/Grafiken).
 - `app/tools/cart.py` – `cart_get`, `cart_add`, `cart_update`, `cart_remove`. Alle Mutationen sind
-  als `requires_confirmation=True` registriert.
+  als `requires_confirmation=True` registriert und liefern den **vollen Warenkorb inkl. items**
+  (`normalize_cart` sortiert Items stabil nach id – Badge und Warenkorbansicht sind konsistent).
 - `app/tools/checkout.py` – kompletter Checkout: `checkout_overview`, `set_checkout_email`,
   `set_shipping_address`, `set_shipping_method`, `set_payment_method`, `place_order` (alle Mutationen
   mit Confirm-Gate; Zahlungsart nur als Code, nie Zahlungsdaten im LLM).
 - `app/tools/showcase.py` – `compose_showcase`: der Agent wählt Layout (hero/compare/moodboard/
   price_chart), Headline, Akzentfarbe (Whitelist) und Produkt-Positionen; das SVG wird serverseitig
   aus den Magento-Produktdaten gerendert (XML-Escaping gegen XSS, Medien-URLs nur vom Magento-Host).
+- `app/tools/view.py` – `compose_view`: maßgeschneiderte Ansichten aus DB-UI-Bausteinen
+  (Whitelist für Blocktypen/Varianten/Aktionen; Produkt-Positionen gegen `last_results` aufgelöst;
+  Showcase-Blöcke mit serverseitigem SVG).
 - `app/tools/cms.py` – `cms_page` als RAG-Korpus für Versand-/Retour-/Datenschutzfragen.
 - `app/agent.py` – Tool-Calling-Loop (Mistral) **und** Mock-Modus ohne API-Key (voller Flow inkl.
   Confirm-Gate und Showcase). Confirm-Gate: schreibende Tools erzeugen `intent: "confirm_required"`
@@ -79,6 +83,8 @@ Jede Komponente ist ein eigener GraphQL-Consumer-Renderer, gefüttert aus Agent-
 | `CheckoutView` | Widget-Stepper (Adresse → Versand → Zahlung → Prüfen & bestellen) | AddressForm + CheckoutStepper (Formular-Hybrid) |
 | `OrderStatusCard` | `order_placed` | OrderStatusCard (Bestellnummer) |
 | `ShowcaseView` | `ui_layout` | vom Agenten generierte Grafik (SVG) + Produktkarten |
+| `DynamicView` | `ui_view` | maßgeschneiderte Ansicht aus DB-UI-Bausteinen (Whitelist serverseitig) |
+| `ProductDetailView` | `product_details` | Detailansicht im Widgetbereich, immer mit Add-to-Cart |
 | `ConfirmDialog` | `confirm_required` | ConfirmDialog (zeigt Tool + JSON-Parameter) |
 | `PolicyAnswer` | `policy_answer` | PolicyAnswer (RAG + Quellenlink) |
 | `ToolTrace` | `tool_trace` / SSE-Events | Live-Anzeige: Toolname + Parameter + Narration im Chat |
